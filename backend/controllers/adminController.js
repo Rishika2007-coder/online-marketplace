@@ -1,0 +1,13 @@
+const db=require('../config/db');
+exports.dashboard=async(req,res)=>{const [[r]]=await db.query("SELECT (SELECT COUNT(*) FROM users WHERE role='customer') customers,(SELECT COUNT(*) FROM users WHERE role='seller') sellers,(SELECT COUNT(*) FROM products) products,(SELECT COUNT(*) FROM orders) orders,(SELECT COALESCE(SUM(total_amount),0) FROM orders) revenue");res.json(r);};
+exports.customers=async(req,res)=>{const [r]=await db.query("SELECT user_id,name,email,mobile,status,created_at FROM users WHERE role='customer' AND (name LIKE ? OR email LIKE ?) ORDER BY created_at DESC",['%'+(req.query.search||'')+'%','%'+(req.query.search||'')+'%']);res.json(r);};
+exports.customerStatus=async(req,res)=>{const status=req.body.status==='blocked'?'blocked':'active';await db.query("UPDATE users SET status=? WHERE user_id=? AND role='customer'",[status,req.params.id]);res.json({message:'Customer status updated'});};
+exports.sellers=async(req,res)=>{const [r]=await db.query("SELECT user_id,name,email,mobile,status,created_at FROM users WHERE role='seller' ORDER BY created_at DESC");res.json(r);};
+exports.sellerStatus=async(req,res)=>{const status=['active','blocked','pending','rejected'].includes(req.body.status)?req.body.status:'active';await db.query("UPDATE users SET status=? WHERE user_id=? AND role='seller'",[status,req.params.id]);res.json({message:'Seller status updated'});};
+exports.products=async(req,res)=>{const [r]=await db.query('SELECT p.*,u.name seller_name FROM products p JOIN users u ON u.user_id=p.seller_id ORDER BY p.created_at DESC');res.json(r);};
+exports.categories=async(req,res)=>{const [r]=await db.query('SELECT * FROM categories ORDER BY category_name');res.json(r);};
+exports.addCategory=async(req,res)=>{const [r]=await db.query('INSERT INTO categories(category_name,description) VALUES(?,?)',[req.body.category_name,req.body.description||'']);res.status(201).json({category_id:r.insertId});};
+exports.updateCategory=async(req,res)=>{await db.query('UPDATE categories SET category_name=?,description=?,status=? WHERE category_id=?',[req.body.category_name,req.body.description||'',req.body.status||'active',req.params.id]);res.json({message:'Category updated'});};
+exports.deleteCategory=async(req,res)=>{await db.query("UPDATE categories SET status='inactive' WHERE category_id=?",[req.params.id]);res.json({message:'Category deactivated'});};
+exports.orders=async(req,res)=>{const [r]=await db.query('SELECT * FROM orders ORDER BY order_date DESC');res.json(r);};
+exports.reports=async(req,res)=>{const [[r]]=await db.query('SELECT COUNT(*) orders,COALESCE(SUM(total_amount),0) revenue,COUNT(DISTINCT customer_id) customers FROM orders');res.json(r);};
